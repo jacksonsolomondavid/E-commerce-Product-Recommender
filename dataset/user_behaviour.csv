@@ -1,0 +1,35 @@
+user_id,action_type,value
+user-A001,search,"ergonomic chair"
+user-A001,view,Office Furniture
+user-A001,search,"best wireless keyboard"
+user-A001,view,Electronics
+user-A001,view,Electronics
+user-A001,search,"high refresh rate monitor"
+user-A001,purchase,Lighting
+user-A001,view,Office Furniture
+user-A001,view,Accessories
+user-A001,search,"USB-C monitor"
+user-A001,purchase,Electronics
+user-A001,view,Electronics
+user-B002,search,"small batch olive oil"
+user-B002,view,Kitchenware
+user-B002,search,"indoor succulent pot"
+user-B002,view,Home Decor
+user-B002,purchase,Home Decor
+user-B002,view,Kitchenware
+user-B002,search,"best home espresso machine reviews"
+user-B002,view,Kitchenware
+user-B002,view,Home Decor
+user-B002,purchase,Lighting
+user-B002,search,"leak proof shaker"
+user-C003,view,Apparel
+user-C003,search,"merino wool sweater"
+user-C003,view,Accessories
+user-C003,purchase,Accessories
+user-C003,view,Apparel
+user-C003,search,"softest cotton sheets"
+user-C003,view,Apparel
+user-C003,purchase,Kitchenware
+user-C003,search,"silk scarf patterns"
+user-C003,view,Accessories
+user-C003,view,Apparel
