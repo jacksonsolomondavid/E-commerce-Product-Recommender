@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Recommender Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'], 
+                    },
+                    colors: { 
+                        'primary': '#059669', // Emerald 600
+                        'secondary': '#1D4ED8', // Blue 700
+                        'accent': '#FDE047', // Yellow 300
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* General Aesthetic Styling */
+        body { 
+            background-color: #f3f4f6; 
+            min-height: 100vh;
+        }
+        .card { 
+            transition: all 0.3s ease-in-out; 
+            transform: translateY(0); 
+            border-left: 5px solid theme('colors.primary');
+        }
+        .card:hover { 
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); 
+            transform: translateY(-5px); 
+        }
+        /* Button Styling */
+        #refresh-btn { 
+            background-image: linear-gradient(to right, theme('colors.primary'), #047857);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(5, 150, 105, 0.3);
+        }
+        #refresh-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(5, 150, 105, 0.4);
+        }
+        #refresh-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        /* File Input Styling for better look */
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            height: 100%;
+            width: 100%;
+        }
+        .file-input-label {
+            border: 2px dashed theme('colors.gray.400');
+            background-color: theme('colors.white');
+            display: block;
+            padding: 1rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .file-input-wrapper:hover .file-input-label {
+            border-color: theme('colors.primary');
+            background-color: theme('colors.green.50');
+        }
+        /* Simple Loading Dots */
+        .loading-dot { animation: bounce 1s infinite; }
+        .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+    </style>
+</head>
+<body class="font-sans p-4 md:p-10">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-12 py-4">
+            <h1 class="text-5xl font-extrabold text-gray-900 mb-2">
+                <span class="text-primary">AI</span> Product Recommender
+            </h1>
+            <p class="text-xl text-gray-600">FastAPI backend with SQLite persistence for dynamic recommendations.</p>
+        </header>
+
+        <!-- Data Input Section -->
+        <div id="data-input" class="bg-white p-8 rounded-2xl shadow-2xl mb-12 border border-gray-200">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2 flex items-center">
+                <svg class="w-6 h-6 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                1. Data Management (Optional Upload)
+            </h2>
+            <p class="text-gray-500 mb-6">Upload new CSV files to **replace** the data in the database, or leave them empty to use the **existing data**.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <label class="block text-lg font-semibold text-gray-700 mb-3">Product Catalog CSV</label>
+                    <div class="file-input-wrapper">
+                        <label for="product-catalog-file" class="file-input-label">
+                            <span class="text-gray-900 font-bold" id="catalog-filename">Choose File</span>
+                            <span id="catalog-status" class="block text-sm mt-1 text-gray-500 font-medium">Click to upload new catalog.</span>
+                        </label>
+                        <input type="file" id="product-catalog-file" accept=".csv">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-lg font-semibold text-gray-700 mb-3">User Behavior Log CSV</label>
+                    <div class="file-input-wrapper">
+                        <label for="user-behavior-file" class="file-input-label">
+                            <span class="text-gray-900 font-bold" id="behavior-filename">Choose File</span>
+                            <span id="behavior-status" class="block text-sm mt-1 text-gray-500 font-medium">Click to upload new behavior log.</span>
+                        </label>
+                        <input type="file" id="user-behavior-file" accept=".csv">
+                    </div>
+                </div>
+            </div>
+            <p id="data-error-message" class="mt-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded font-semibold hidden">Please ensure a User ID is entered.</p>
+        </div>
+
+        <!-- Recommendation Section -->
+        <div id="user-info" class="bg-white p-8 rounded-2xl shadow-2xl mb-12 border border-secondary/30">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2 flex items-center">
+                <svg class="w-6 h-6 text-secondary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2-3-.895-3-2 1.343-2 3-2zM4 16s1.5-1 4-1 4 1 4 1v1H4v-1zM20 16s-1.5-1-4-1-4 1-4 1v1h12v-1z"></path></svg>
+                2. Generate Personalized Recommendations
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                <div class="lg:col-span-1">
+                    <label for="user-id-input" class="block text-lg font-semibold text-gray-700 mb-2">Target User ID:</label>
+                    <input type="text" id="user-id-input" value="user-A001" placeholder="e.g., user-A001"
+                           class="w-full px-4 py-3 border-2 border-secondary/50 rounded-lg text-xl font-bold text-secondary focus:ring-secondary focus:border-secondary transition duration-150">
+                    <button id="refresh-btn" class="mt-6 w-full px-6 py-4 text-white font-bold rounded-xl text-xl shadow-lg">
+                        Submit ID & Get Recommendations 
+                    </button>
+                </div>
+                
+                <div class="lg:col-span-2 p-4 border rounded-xl bg-gray-50">
+                    <p class="text-lg font-semibold text-gray-700 mb-2 flex items-center">
+                        <svg class="w-5 h-5 text-secondary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v14M9 19c0 1.105-1.79 2-4 2s-4-1.105-4-2h8zM9 19v-5c0-1.105-1.79-2-4-2s-4 1.105-4 2h8zM21 3v14c0 1.105-1.79 2-4 2s-4-1.105-4-2V3l12 3z"></path></svg>
+                        User Activity Context (from Database):
+                    </p>
+                    <p class="text-md text-gray-600 leading-relaxed" id="behavior-display">
+                        --- Enter a User ID and submit to view aggregated behavior ---
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <section>
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                <svg class="w-6 h-6 text-accent mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13M18.675 18.675a6 6 0 01-8.485 0M12 8v8m-4-6h8"></path></svg>
+                3. Top Recommendations
+            </h2>
+            <div id="recommendations-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div id="initial-loading" class="md:col-span-3 text-center p-12 bg-white rounded-xl shadow-md border-2 border-dashed border-gray-300">
+                    <p class="text-lg text-gray-500">Awaiting data submission. Results, including AI rationale, will appear here.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script type="module">
+        // --- Configuration ---
+        const API_BASE_URL = "http://127.0.0.1:8000"; 
+        const LLM_API_URL_BASE = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`;
+        const apiKey = "AIzaSyDPcOuhxVTbF6hncUhy45Vpisf5DFRKBrs"; // Leave empty string: Canvas will provide the key at runtime.
+
+        // --- DOM Elements ---
+        const container = document.getElementById('recommendations-container');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const userIdInput = document.getElementById('user-id-input');
+        const catalogFile = document.getElementById('product-catalog-file');
+        const behaviorFile = document.getElementById('user-behavior-file');
+        const dataErrorDisplay = document.getElementById('data-error-message');
+        const behaviorDisplay = document.getElementById('behavior-display');
+        const catalogFilenameDisplay = document.getElementById('catalog-filename');
+        const behaviorFilenameDisplay = document.getElementById('behavior-filename');
+
+
+        // --- Utility Functions ---
+
+        function setButtonState(disabled, text) {
+            refreshBtn.disabled = disabled;
+            // The text is set directly on the button element
+            refreshBtn.textContent = text;
+        }
+        
+        function getLoadingMarkup() {
+            return `<div class="flex items-center space-x-1 text-primary"><span class="text-sm font-semibold">Generating AI Insight</span><div class="loading-dot w-2 h-2 bg-primary rounded-full"></div><div class="loading-dot w-2 h-2 bg-primary rounded-full"></div><div class="loading-dot w-2 h-2 bg-primary rounded-full"></div></div>`;
+        }
+        
+        function updateBehaviorDisplay(behavior, userId) {
+            if (!behavior || Object.values(behavior).every(arr => arr.length === 0)) {
+                behaviorDisplay.innerHTML = `<span class="text-red-500 font-semibold">User ID: ${userId} not found or has no activity in the database.</span>`;
+                return;
+            }
+            // Use descriptive labels for behavior items
+            const viewed = behavior.view.length ? `<span class="font-bold text-gray-900">${behavior.view.length} items</span> (${behavior.view.slice(0, 3).join(", ") + (behavior.view.length > 3 ? '...' : '')})` : 'None';
+            const searched = behavior.search.length ? `<span class="font-bold text-gray-900">${behavior.search.length} terms</span> (${behavior.search.slice(0, 3).join(", ") + (behavior.search.length > 3 ? '...' : '')})` : 'None';
+            const purchased = behavior.purchase.length ? `<span class="font-bold text-gray-900">${behavior.purchase.length} items</span> (${behavior.purchase.slice(0, 3).join(", ") + (behavior.purchase.length > 3 ? '...' : '')})` : 'None';
+
+            behaviorDisplay.innerHTML = `
+                <ul class="space-y-2 list-disc list-inside">
+                    <li><span class="font-medium text-secondary">Views:</span> ${viewed}</li>
+                    <li><span class="font-medium text-secondary">Searches:</span> ${searched}</li>
+                    <li><span class="font-medium text-secondary">Purchases:</span> ${purchased}</li>
+                </ul>
+            `;
+        }
+
+        async function fetchAndDisplayExplanation(payload, explanationElement) {
+            // Check for API key (required for LLM call)
+            if (!apiKey) {
+                explanationElement.innerHTML = '<span class="text-red-500">LLM API Key Missing. Cannot generate insight.</span>';
+                return;
+            }
+            
+            try {
+                // LLM API call using the structured prompt payload from the FastAPI backend
+                const response = await fetch(`${LLM_API_URL_BASE}?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: payload.userQuery }] }],
+                        systemInstruction: { parts: [{ text: payload.systemInstruction }] },
+                        model: payload.model
+                    })
+                });
+                
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || 'LLM Error: Could not generate explanation.';
+                explanationElement.classList.remove('italic', 'text-sm');
+                explanationElement.innerHTML = `<span class="text-gray-700">${text.trim()}</span>`;
+
+            } catch (error) {
+                explanationElement.innerHTML = '<span class="text-red-500">LLM API call failed (network or rate limit).</span>';
+                console.error("LLM Generation Error:", error);
+            }
+        }
+        
+        function createProductCard(recommendation) {
+            const product = recommendation;
+            const card = document.createElement('div');
+            card.className = 'card bg-white rounded-xl shadow-lg overflow-hidden flex flex-col h-full transition duration-300';
+            card.innerHTML = `
+                <div class="p-6 flex-grow">
+                    <span class="inline-block px-3 py-1 text-sm font-bold rounded-full bg-primary/10 text-primary mb-3">${product.category}</span>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">${product.name}</h3>
+                    <p class="text-4xl font-extrabold text-secondary mt-1">$${parseFloat(product.price ?? 0).toFixed(2)}</p>
+                    <p class="text-gray-500 text-sm mt-3 font-medium">Product ID: ${product.product_id} | Relevance Score: <span class="text-primary font-bold">${(product.score ?? 0).toFixed(1)}</span></p>
+                </div>
+                <div class="bg-gray-50 p-6 border-t border-gray-100">
+                    <h4 class="text-lg font-bold text-gray-800 mb-2 flex items-center">
+                        <svg class="w-5 h-5 text-secondary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6 1.5l-1 1M18 10h1M5 10H4M21 12a9 9 0 11-18 0 9 9 0 0118 0zM10.5 13.5h3c.52 0 .943-.4.943-.919s-.423-.919-.943-.919h-3c-.52 0-.943.4-.943.919s.423.919.943.919z"></path></svg>
+                        Recommendation Rationale (AI):
+                    </h4>
+                    <div id="explanation-${product.product_id}" class="text-gray-600 italic text-sm min-h-[50px]">
+                        ${getLoadingMarkup()}
+                    </div>
+                </div>
+            `;
+
+            const explanationElement = card.querySelector(`#explanation-${product.product_id}`);
+            // Start fetching LLM explanation using the payload provided by the FastAPI backend
+            fetchAndDisplayExplanation(product.llm_prompt_payload, explanationElement);
+
+            return card;
+        }
+
+        // --- Main Recommendation Flow (Connects to FastAPI) ---
+
+        async function renderRecommendations() {
+            const userId = userIdInput.value.trim();
+            // Get selected files (can be null/undefined)
+            const catalogFile = document.getElementById('product-catalog-file').files[0];
+            const behaviorFile = document.getElementById('user-behavior-file').files[0];
+            
+            container.innerHTML = '';
+            dataErrorDisplay.classList.add('hidden');
+            
+            // FIX: Only check for the mandatory User ID. Files are optional.
+            if (!userId) {
+                dataErrorDisplay.textContent = "Please enter a User ID to get recommendations.";
+                dataErrorDisplay.classList.remove('hidden');
+                return;
+            }
+
+            setButtonState(true, 'Processing Data & Calculating...');
+            
+            // 1. Build the FormData payload for the FastAPI API
+            const formData = new FormData();
+            
+            // Only append files if they were selected
+            if (catalogFile) {
+                formData.append('catalog_file', catalogFile);
+            }
+            if (behaviorFile) {
+                formData.append('behavior_file', behaviorFile);
+            }
+
+            formData.append('user_id', userId);
+            
+            try {
+                // 2. Call the FastAPI endpoint (using POST method with files/form data)
+                const response = await fetch(`${API_BASE_URL}/api/recommend/`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    container.innerHTML = `<p class="md:col-span-3 text-center p-12 bg-red-100 rounded-xl shadow-inner text-red-700 font-semibold">API Error (${response.status}): ${error.detail || 'An unknown server error occurred.'}</p>`;
+                    updateBehaviorDisplay(null, userId);
+                    return;
+                }
+                
+                // 3. Receive the structured JSON response from the backend
+                const recommendations = await response.json();
+                
+                if (recommendations.length === 0) {
+                    container.innerHTML = `<p class="md:col-span-3 text-center p-12 bg-white rounded-xl shadow-md border-2 border-dashed border-gray-300 text-gray-600">No relevant recommendations found for user ${userId} based on their history.</p>`;
+                    updateBehaviorDisplay(null, userId);
+                } else {
+                    // 4. Update behavior display and render cards
+                    // Note: user_behavior_context is present on all recommendation items
+                    updateBehaviorDisplay(recommendations[0].user_behavior_context, userId);
+                    recommendations.forEach(rec => {
+                        container.appendChild(createProductCard(rec));
+                    });
+                }
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                container.innerHTML = `<p class="md:col-span-3 text-center p-12 bg-red-100 rounded-xl shadow-inner text-red-700">CONNECTION ERROR: Could not reach the FastAPI backend at ${API_BASE_URL}. Ensure the Python server is running and accessible.</p>`;
+            } finally {
+                setButtonState(false, 'Submit ID & Get Recommendations');
+            }
+        }
+
+        // --- Event Listeners ---
+        refreshBtn.addEventListener('click', renderRecommendations);
+        
+        // Update file input labels on selection
+        catalogFile.addEventListener('change', () => {
+            const fileName = catalogFile.files[0] ? catalogFile.files[0].name : 'Choose File';
+            catalogFilenameDisplay.textContent = fileName;
+            document.getElementById('catalog-status').textContent = `Status: File selected. Uploading will REPLACE database data.`;
+        });
+
+        behaviorFile.addEventListener('change', () => {
+            const fileName = behaviorFile.files[0] ? behaviorFile.files[0].name : 'Choose File';
+            behaviorFilenameDisplay.textContent = fileName;
+            document.getElementById('behavior-status').textContent = `Status: File selected. Uploading will REPLACE database data.`;
+        });
+    </script>
+</body>
+</html>

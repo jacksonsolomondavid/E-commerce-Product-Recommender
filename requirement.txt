@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+sqlalchemy
+python-multipart # Required for handling form data and file uploads
+pandas # Although not strictly used for all parsing, good practice for data manipulation
